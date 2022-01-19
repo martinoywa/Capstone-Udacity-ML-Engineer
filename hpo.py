@@ -94,6 +94,24 @@ def create_dataloaders(data, batch_size, max_length):
     test_loader = DataLoader(test_set, sampler=SequentialSampler(test_set), batch_size=batch_size)
     
     return train_loader, valid_loader_ test_loader
+
+
+def train(model, train_loader, valid_loader, epochs, optimizer, scheduler, device):
+    logger.info("BEGIN TRAINING")
+    logger.info("COMPLETE TRAINING")
+    pass
+
+
+def test(model, test_loader):
+    logger.info("BEGIN TESTING")
+    logger.info("COMPLETE TESTING")
+    pass
+
+
+def save_model(model, model_dir):
+    logger.info("SAVING MODEL WEIGHTS")
+    path = os.path.join(model_dir, "model.pth")
+    torch.save(model.cpu().state_dict(), path)
     
 
 def main(args):
@@ -114,6 +132,15 @@ def main(args):
     
     # data loaders
     train_loader, valid_loader, test_loader = create_data_loaders(args.data_dir, args.batch_size, args.max_length)
+    
+    # train model
+    train(model, train_loader, valid_loader, args.epochs, optimizer, scheduler, device)
+    
+    # test model
+    test(model, test_loader)
+    
+    # save model
+    save_model(model, args.model_dir)
 
 
 if __name__ == "__main__":
