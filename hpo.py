@@ -11,6 +11,8 @@ from transformers import (
     AdamW, get_linear_schedule_with_warmup
 )
 
+from sklearn.metric import classification_report
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -98,14 +100,83 @@ def create_dataloaders(data, batch_size, max_length):
 
 def train(model, train_loader, valid_loader, epochs, optimizer, scheduler, device):
     logger.info("BEGIN TRAINING")
+    for i in range(epochs):
+        model.train()
+        train_loss = 0
+        for batch in train_loader:
+            batch = tuple(b.to(device) for b in batch)
+            
+            inputs = {
+            "input_ids": batch[0],
+            "attention_mask": batch[1],
+            "labels": batch[2]
+                  }
+            
+            optimizer.zero_grad()
+            output = model(**inputs)
+            loss = output[0]
+            train_loss += loss.item()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            scheduler.step()
+            
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for batch in valid_loader:
+                batch = tuple(b.to(device) for b in batch)
+
+                inputs = {
+                "input_ids": batch[0],
+                "attention_mask": batch[1],
+                "labels": batch[2]
+                }
+
+                output = model(**inputs)
+                loss = output[0]
+                val_loss += loss.item()
+                
+        logger.info(f"Epoch: {i}, Train loss: {train_loss/len(train_loader):.3f}, Val loss: {val_loss/len(valid_loader):.3f}")
     logger.info("COMPLETE TRAINING")
-    pass
 
 
 def test(model, test_loader):
     logger.info("BEGIN TESTING")
+    model.to("cpu")
+    model.eval()
+
+    test_loss = 0
+    y_pred, y_true = [], []
+
+    with torch.no_grad():
+        for batch in test_loader:
+            batch = tuple(b.to(device) for b in batch)
+
+            inputs = {
+                "input_ids": batch[0],
+                "attention_mask": batch[1],
+                "labels": batch[2]
+            }
+
+
+            outputs = model(**inputs)
+            loss = outputs[0]
+            logits = outputs[1]
+            test_loss += loss.item()
+
+            logits = logits.detach().cpu().numpy()
+            label_ids = inputs["labels"].cpu().numpy()
+            y_pred.append(logits)
+            y_true.append(label_ids)
+
+    predictions = np.concatenate(y_pred, axis=0)
+    true_vals = np.concatenate(y_true, axis=0)
+    
+    logger.info(classification_report(list(true_vals), [_.argmax(0) for _ in predictions]))
+    logger.info(f"Test Loss: {test_loss/len(test_loader):.4f}")
     logger.info("COMPLETE TESTING")
-    pass
+    
 
 
 def save_model(model, model_dir):
