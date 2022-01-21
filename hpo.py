@@ -1,3 +1,6 @@
+import os
+import sys
+
 import argparse
 import logging
 
@@ -10,8 +13,9 @@ from transformers import (
     BertForSequenceClassification, BertTokenizer, 
     AdamW, get_linear_schedule_with_warmup
 )
-
-from sklearn.metric import classification_report
+import pandas as pd
+import numpy as np
+import sklearn
 
 
 logger = logging.getLogger(__name__)
@@ -36,11 +40,17 @@ def net():
 
 def data_reader(data):
     logger.info("READ DATA FILES")
-    with open(train_data+"/lyrics.txt", "r") as f:
+    with open(data+"/lyrics.txt", "r") as f:
         lyrics = f.read()
         
-    with open(train_data+"/labels.txt", "r") as f:
+    with open(data+"/labels.txt", "r") as f:
         labels = f.read()
+        
+    # remove empty
+    lyrics = lyrics.split("\n")
+    labels = labels.split("\n")
+    lyrics.remove('')
+    labels.remove('')
     
     return lyrics, labels
 
@@ -67,12 +77,12 @@ def encode_data(lyrics, labels, max_length):
     return input_ids, attention_masks, labels
 
 
-def create_dataloaders(data, batch_size, max_length):
+def create_data_loaders(train_data, valid_data, test_data, batch_size, max_length):
     # get the data sets
     logger.info("CREATING DATA LOADERS")
-    train_data = os.path.join(data, "train")
-    valid_data = os.path.join(data, "valid")
-    test_data = os.path.join(data, "test")
+#     train_data = os.path.join(train_data, "train")
+#     valid_data = os.path.join(valid_data, "valid")
+#     test_data = os.path.join(test_data, "test")
     
     # read the data
     train_lyrics, train_labels = data_reader(train_data)
@@ -95,7 +105,7 @@ def create_dataloaders(data, batch_size, max_length):
     valid_loader = DataLoader(valid_set, sampler=SequentialSampler(valid_set), batch_size=batch_size)
     test_loader = DataLoader(test_set, sampler=SequentialSampler(test_set), batch_size=batch_size)
     
-    return train_loader, valid_loader_ test_loader
+    return train_loader, valid_loader, test_loader
 
 
 def train(model, train_loader, valid_loader, epochs, optimizer, scheduler, device):
@@ -151,8 +161,6 @@ def test(model, test_loader):
 
     with torch.no_grad():
         for batch in test_loader:
-            batch = tuple(b.to(device) for b in batch)
-
             inputs = {
                 "input_ids": batch[0],
                 "attention_mask": batch[1],
@@ -173,7 +181,7 @@ def test(model, test_loader):
     predictions = np.concatenate(y_pred, axis=0)
     true_vals = np.concatenate(y_true, axis=0)
     
-    logger.info(classification_report(list(true_vals), [_.argmax(0) for _ in predictions]))
+    logger.info(sklearn.metric.classification_report(list(true_vals), [_.argmax(0) for _ in predictions]))
     logger.info(f"Test Loss: {test_loss/len(test_loader):.4f}")
     logger.info("COMPLETE TESTING")
     
@@ -192,7 +200,7 @@ def main(args):
     
     # move model to gpu
     model = net()
-    model.to(deviceice)
+    model.to(device)
     
     # optimizer and linear scheduler
     # https://stackoverflow.com/questions/60120043/optimizer-and-scheduler-for-bert-fine-tuning
@@ -202,7 +210,10 @@ def main(args):
                                                 num_training_steps=args.batch_size*args.epochs)
     
     # data loaders
-    train_loader, valid_loader, test_loader = create_data_loaders(args.data_dir, args.batch_size, args.max_length)
+    logger.info(f"TRAIN DATA DIRECTORY {args.train_dir}")
+    logger.info(f"VALID DATA DIRECTORY {args.valid_dir}")
+    logger.info(f"TEST DATA DIRECTORY {args.test_dir}")
+    train_loader, valid_loader, test_loader = create_data_loaders(args.train_dir, args.valid_dir, args.test_dir, args.batch_size, args.max_length)
     
     # train model
     train(model, train_loader, valid_loader, args.epochs, optimizer, scheduler, device)
@@ -251,7 +262,9 @@ if __name__ == "__main__":
     
     # container specific arguments
     parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"])
-    parser.add_argument("--data-dir", type=str, default=os.environ["SM_CHANNEL_TRAINING"])
+    parser.add_argument("--train-dir", type=str, default=os.environ["SM_CHANNEL_TRAIN"])
+    parser.add_argument("--valid-dir", type=str, default=os.environ["SM_CHANNEL_VALID"])
+    parser.add_argument("--test-dir", type=str, default=os.environ["SM_CHANNEL_TEST"])
     
     args = parser.parse_args()
     
