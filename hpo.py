@@ -15,7 +15,7 @@ from transformers import (
 )
 import pandas as pd
 import numpy as np
-import sklearn
+import sklearn.metrics as metrics
 
 
 logger = logging.getLogger(__name__)
@@ -181,7 +181,7 @@ def test(model, test_loader):
     predictions = np.concatenate(y_pred, axis=0)
     true_vals = np.concatenate(y_true, axis=0)
     
-    logger.info(sklearn.metric.classification_report(list(true_vals), [_.argmax(0) for _ in predictions]))
+    logger.info(metrics.classification_report(list(true_vals), [_.argmax(0) for _ in predictions]))
     logger.info(f"Test Loss: {test_loss/len(test_loader):.4f}")
     logger.info("COMPLETE TESTING")
     
