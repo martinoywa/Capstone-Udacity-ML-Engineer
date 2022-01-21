@@ -1,7 +1,7 @@
 # Capstone-Udacity-ML-Engineer
 MUSIC EMOTION RECOGNITION WITH DEEP LEARNING ON AWS SAGEMAKER
 
-Software and Libraries Specifications
+### Software and Libraries Specifications
 - pandas-profiling
 - pandas
 - nltk
@@ -11,3 +11,7 @@ Software and Libraries Specifications
 - pytorch
 - numpy
 - transformers
+
+### Capstone Project Submission Notes
+
+https://review.udacity.com/#!/reviews/3374150
